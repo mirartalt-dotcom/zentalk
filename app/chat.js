@@ -61,9 +61,13 @@ function botTalk(text){typing(true);
   chatAnswer(text,function(ans){typing(false);el(ans,'msg bot');
     if(pending===null&&S.quiz&&S.habits.length)offerMain();});}
 function num0100(text){
-  if(text.trim().length>14)return null; /* длинная фраза = разговор, не ответ цифрой */
   var t=wordsToNums(text.toLowerCase());
-  var m=t.match(/\d{1,3}/);if(!m)return null;var n=+m[0];return n>100?null:n;}
+  var m=t.match(/\d{1,3}/);if(!m)return null;var n=+m[0];if(n>100)return null;
+  /* ответ цифрой = число + немного слов-паразитов; длинный рассказ = разговор */
+  var rest=t.replace(/\d+/g,' ')
+    .replace(/(примерно|где\s?то|наверное|навскидку|около|думаю|может|быть|ну|типа|энерги\w*|сейчас|сегодня|вчера|процент\w*|балл\w*|уровень|день|дня|дней|ночи|ночей|раз|раза|у|меня|на|из|по|моему|штук|так|вот|где)/g,' ')
+    .replace(/[^а-яёa-z]/g,'');
+  return rest.length<=8?n:null;}
 
 /* ---------- сценарии ---------- */
 function greet(){
@@ -134,27 +138,49 @@ function pickHabit(h){
            {t:'📅 В календарь',fn:function(){downloadICS();botMsg('Скинул файл напоминания — открой его, и календарь будет звать каждый вечер.',offerMain);}},
            {t:'Сам зайду',fn:function(){botMsg('Уважаю. Серия 1 — сегодня вечером. Я тут 🌿',offerMain);}}]);});});}
 
-/* ежедневный замер */
+/* ежедневный замер — умеет принимать всё одной фразой на любом шаге */
 var chk={};
+function comboParse(text){ /* true = что-то принял и продвинулся */
+  var p=localParse(text);
+  var got=false;
+  if(p.energy!=null&&chk.energy==null){chk.energy=p.energy;got=true;}
+  if(p.kept!=null){S.habits.forEach(function(h,i){if(chk['k'+i]==null)chk['k'+i]=p.kept;});got=true;}
+  if(p.hard!=null&&chk.hard==null){chk.hard=p.hard;got=true;}
+  if(!got)return false;
+  clearChips();
+  var parts=[];
+  if(p.energy!=null)parts.push('энергия '+Math.round(p.energy));
+  if(p.kept!=null)parts.push('привычка '+(p.kept>=70?'да':p.kept>=40?'наполовину':'срыв'));
+  if(p.hard!=null)parts.push(p.hard>=70?'далось тяжело':p.hard>=40?'средне':'легко');
+  botMsg('Принял: '+parts.join(' · ')+'.',nextCheckStep);
+  return true;}
+function nextCheckStep(){
+  if(chk.energy==null){askCheckEnergy();return;}
+  for(var i=0;i<S.habits.length;i++)if(chk['k'+i]==null){askKept(i);return;}
+  if(chk.hard==null){askHard();return;}
+  finishCheck();}
 function startCheck(){clearChips();
   if(S.lastCheck===todayStr()){botMsg('Сегодня уже засчитано ✓ Возвращайся завтра — серия в безопасности.',offerMain);return;}
+  chk={};
   var d=Math.min((S.streak%7)+1,7);
-  botMsg('Серия '+d+' из 7. Вопрос первый: сколько сегодня энергии? Можно голосом 🎙 — скажи всё сразу: «энергия 70, держался, было легко».',function(){
-    askEnergy(function(v){chk.energy=v;askKept(0);});});}
+  botMsg('Серия '+d+' из 7. Можно голосом 🎙 всё сразу: «энергия 70, держался, было легко» — или по шагам. Сколько сегодня энергии?',function(){
+    askCheckEnergy();});}
+function askCheckEnergy(){
+  sliderMsg(function(v){meMsg('Энергия: '+v);chk.energy=v;nextCheckStep();});
+  expect(comboParse);}
 function askKept(i){
-  if(i>=S.habits.length){askHard();return;}
   var h=habit(S.habits[i].id);
   botMsg(h.daily,function(){
-    chips([{t:'Да, чисто',fn:function(){meMsg('Да');chk['k'+i]=90;askKept(i+1);}},
-           {t:'Наполовину',fn:function(){meMsg('Наполовину');chk['k'+i]=55;askKept(i+1);}},
-           {t:'Сорвался',fn:function(){meMsg('Сорвался');chk['k'+i]=10;askKept(i+1);}}]);
-    expect(function(t){var p=localParse(t);if(p.kept===null)return false;chk['k'+i]=p.kept;askKept(i+1);return true;});});}
+    chips([{t:'Да, чисто',fn:function(){meMsg('Да');chk['k'+i]=90;nextCheckStep();}},
+           {t:'Наполовину',fn:function(){meMsg('Наполовину');chk['k'+i]=55;nextCheckStep();}},
+           {t:'Сорвался',fn:function(){meMsg('Сорвался');chk['k'+i]=10;nextCheckStep();}}]);
+    expect(comboParse);});}
 function askHard(){
   botMsg('И насколько тяжело далось?',function(){
     chips([{t:'Легко',fn:function(){meMsg('Легко');chk.hard=12;finishCheck();}},
            {t:'Нормально',fn:function(){meMsg('Нормально');chk.hard=45;finishCheck();}},
            {t:'На зубах',fn:function(){meMsg('На зубах');chk.hard=85;finishCheck();}}]);
-    expect(function(t){var p=localParse(t);if(p.hard===null)return false;chk.hard=p.hard;finishCheck();return true;});});}
+    expect(comboParse);});}
 function finishCheck(){
   var kept=[];S.habits.forEach(function(h,i){kept.push(chk['k'+i]!=null?chk['k'+i]:70);});
   var rec={energy:chk.energy||0,kept:kept,hard:chk.hard||50};
