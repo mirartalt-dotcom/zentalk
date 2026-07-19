@@ -1,0 +1,22 @@
+/* ===== Тема DRINKIT: светлое, сочное, дружелюбное ===== */
+:root{
+  --bg:#F7F3EA; --card:#FFFFFF; --soft:#EDF2DC;
+  --tx:#23221E; --tx2:#7A756A; --line:#E7E1D4;
+  --acc:#A8C96B; --acc-d:#56732E;
+  --btn:#23221E; --btntx:#F7F3EA; --btnsh:0 14px 34px rgba(35,34,30,.16);
+  --btnr:22px; --r:26px;
+  --thumb:#FFFFFF; --thumbline:#23221E; --canline:#23221E;
+  --leakbg:#F8E7DF; --cardsh:0 10px 28px rgba(35,34,30,.07);
+  --veil:linear-gradient(180deg,rgba(20,19,15,.06) 0%,rgba(20,19,15,.02) 40%,rgba(20,19,15,.55) 100%);
+  --dispf:'Inter',sans-serif; --dispw:850; --h2w:800;
+}
+h1.display{letter-spacing:-.03em}
+h2{letter-spacing:-.02em}
+.btn-pri{border-radius:22px}
+.scr-cinema{color:#F4F1EA}
+.brandline{font-family:'Inter',sans-serif;font-style:normal;font-weight:800;letter-spacing:.18em;font-size:13px}
+.poster{border-radius:24px}
+.chip{border-width:2px}
+.msg.bot{border:0;box-shadow:0 4px 16px rgba(35,34,30,.06)}
+.chat-head{border:0;box-shadow:0 2px 12px rgba(35,34,30,.05)}
+.dk-emoji{font-size:34px;line-height:1}
