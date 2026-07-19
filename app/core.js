@@ -225,6 +225,37 @@ function makeRecognizer(onText,onState){
       rec.onend=function(){if(listening){listening=false;onState(false);}};
       try{rec.start();}catch(e){listening=false;onState(false);}}};}
 
+/* побег из встроенного браузера (Телеграм и т.п.) в Safari/Chrome */
+(function(){
+  var ua=navigator.userAgent||'';
+  var iosInApp=/iPhone|iPad|iPod/.test(ua)&&/AppleWebKit/.test(ua)
+    &&!/Safari\//.test(ua)&&!/CriOS|FxiOS|EdgiOS/.test(ua)&&!navigator.standalone;
+  var andInApp=/Android/.test(ua)&&(/Telegram/i.test(ua)||/; wv\)/.test(ua));
+  if(!iosInApp&&!andInApp)return;
+  var url=location.href.split('#')[0];
+  function go(){
+    try{
+      if(iosInApp){location.href='x-safari-'+url;}
+      else{location.href='intent://'+url.replace(/^https?:\/\//,'')+
+        '#Intent;scheme=https;S.browser_fallback_url='+encodeURIComponent(url)+';end';}
+    }catch(e){}
+  }
+  var bar=document.createElement('div');
+  bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#A8C96B;color:#14130F;'+
+    'font:600 14px Inter,-apple-system,sans-serif;padding:10px 14px;display:flex;gap:10px;align-items:center;'+
+    'justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.25);padding-top:calc(10px + env(safe-area-inset-top))';
+  bar.innerHTML='<span>Лучше в браузере — там работает голос 🎙</span>';
+  var b=document.createElement('button');
+  b.textContent='Открыть';
+  b.style.cssText='border:0;background:#14130F;color:#F4F1EA;border-radius:99px;padding:9px 18px;'+
+    'font:700 14px Inter,-apple-system,sans-serif;cursor:pointer;flex:none';
+  b.addEventListener('click',go);
+  bar.appendChild(b);
+  if(document.body)document.body.appendChild(bar);
+  else document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(bar);});
+  setTimeout(go,700);
+})();
+
 /* живые фоны */
 function initCinefades(){$$('.cinefade').forEach(function(box){
   if(box.dataset.ready)return;box.dataset.ready='1';
