@@ -179,16 +179,17 @@ function localParse(text){var t=wordsToNums(text.toLowerCase());var o={energy:nu
   else if(/(нормально|средне|терпимо)/.test(t))o.hard=45;
   else if(/(легко|само|без проблем|спокойно)/.test(t))o.hard=12;
   return o;}
-function llm(sys,user,cb){ /* cb(text|null) */
+function llm(sys,user,cb){ /* user: строка или массив [{role,content}] ; cb(text|null) */
   var c=aiConf();
+  var msgs=Array.isArray(user)?user:[{role:'user',content:user}];
   if(c.provider==='claude'&&c.key){
     fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':c.key,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:300,system:sys,messages:[{role:'user',content:user}]})})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,system:sys,messages:msgs})})
       .then(function(r){return r.json();}).then(function(d){cb(d.content&&d.content[0]?d.content[0].text:null);})
       .catch(function(){cb(null);});}
   else if(c.provider==='groq'&&c.key){
     fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+c.key,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.4,max_tokens:300,messages:[{role:'system',content:sys},{role:'user',content:user}]})})
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.6,max_tokens:600,messages:[{role:'system',content:sys}].concat(msgs)})})
       .then(function(r){return r.json();}).then(function(d){cb(d.choices&&d.choices[0]?d.choices[0].message.content:null);})
       .catch(function(){cb(null);});}
   else cb(null);}
@@ -203,12 +204,33 @@ var FAQ=[
  [/купить|где|додо/i,'DZEN ищи в Додо Пицце. Манго-маракуйя или лайм-мята — выбери сторону.'],
  [/сери|стрик|заморозк/i,'Заходи раз в день — замер занимает 30 секунд. Пропустил день? Раз в неделю заморозка прощает один пропуск, автоматически.'],
  [/энерг/i,'Энергия любит скучные вещи: сон до 23, движение, меньше сахара и новостей. Я помогу — выбери одну привычку и держи 7 дней.']];
+var CHAT_HIST=[];
+function userCtx(){
+  var p=[];
+  if(S.quiz)p.push('индекс ресурса '+S.quiz.index+'/100');
+  if(S.habits.length)p.push('привычка в фокусе: «'+habit(S.habits[0].id).title+'»'+(S.habits[1]?(' + «'+habit(S.habits[1].id).title+'»'):''));
+  if(S.streak)p.push('серия замеров: '+S.streak+' '+plural(S.streak,'день','дня','дней'));
+  var e=[];for(var i=4;i>=0;i--){var r=S.days[addDays(todayStr(),-i)];if(r)e.push(r.energy);}
+  if(e.length)p.push('энергия за последние дни: '+e.join(', '));
+  return p.length?p.join('; '):'данных пока нет — первый разговор';}
 function chatAnswer(text,cb){
-  var sys='Ты — банка газировки DZEN, талисман трекера энергии. Характер: уверенный, честный, лёгкая ирония, премиум, отвечай КОРОТКО (1-3 предложения), по-русски, на «ты». Факты о продукте: газировка DZEN — 0 г сахара, ~20 ккал/100 г, пребиотики и ~4 г клетчатки для микробиоты, без Е-шек; продаётся в Додо Пицце; вкусы: лайм-мята, манго-маракуйя, виноград. Слоган: «Газировка, после которой чувствуешь себя лучше». Ты помогаешь следить за энергией: 1 привычка на 7 дней = сезон, ежедневный замер. НИКОГДА не обещай лечение («поддерживает», не «лечит»). Не выдумывай скидки и факты.';
-  llm(sys,text,function(raw){
-    if(raw){cb(raw.trim());return;}
+  var sys='Ты — собеседник в трекере «DZEN·Энергия»: эксперт мирового уровня по энергии, сну, привычкам, питанию, стрессу и работоспособности. '+
+  'Твоя цель — чтобы человек ОФИГЕЛ от того, насколько полезный, точный и персональный ответ получил именно под свою ситуацию.\n'+
+  'ПРАВИЛА:\n'+
+  '1. Отвечай по существу его слов: отражай контекст, попадай в его жизнь, никаких шаблонных лекций.\n'+
+  '2. Давай механизм («почему так работает») + 2-3 конкретных шага, применимых сегодня. Цифры и протоколы приветствуются: свет в глаза в первые 30 минут после подъёма; кофеин минимум за 8 часов до сна; правило 10-3-2-1; 25-30 г белка на завтрак; прогулка 10 минут после еды; спальня 18-20°; экраны за час до сна; «правило 2 минут» для старта привычки.\n'+
+  '3. Если данных мало — дай лучший ответ по тому, что есть, и задай ОДИН точный уточняющий вопрос в конце.\n'+
+  '4. Тон: на «ты», живой, уверенный, без воды и нравоучений, лёгкая ирония уместна. 3-6 коротких предложений или мини-список. Без эмодзи-спама (максимум один).\n'+
+  '5. ПРО ПРОДУКТ — ЖЁСТКО: НИКОГДА не упоминай газировку DZEN, банку, напиток или Додо Пиццу, если человек САМ прямо не спросил про напиток/банку/где купить. Ты эксперт, а не продавец. Если спросил: 0 г сахара, ~20 ккал/100 г, пребиотики, ~4 г клетчатки, без Е-шек, продаётся в Додо Пицце; говори «поддерживает», не «лечит».\n'+
+  '6. Никаких диагнозов; при тревожных симптомах — одной строкой посоветуй врача и продолжи по существу.\n'+
+  'Контекст человека из трекера: '+userCtx()+'.';
+  CHAT_HIST.push({role:'user',content:text});
+  if(CHAT_HIST.length>12)CHAT_HIST=CHAT_HIST.slice(-12);
+  llm(sys,CHAT_HIST.slice(),function(raw){
+    if(raw){var a=raw.trim();CHAT_HIST.push({role:'assistant',content:a});
+      if(CHAT_HIST.length>12)CHAT_HIST=CHAT_HIST.slice(-12);cb(a);return;}
     for(var i=0;i<FAQ.length;i++)if(FAQ[i][0].test(text)){cb(FAQ[i][1]);return;}
-    cb('Связь с нейронкой моргнула — спроси ещё раз через пару секунд. А про энергию, привычки и банку DZEN я отвечаю всегда 🌿');});}
+    cb('Связь с нейронкой моргнула — повтори через пару секунд, я отвечу.');});}
 
 /* распознавание речи */
 function makeRecognizer(onText,onState){
