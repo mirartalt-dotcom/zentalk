@@ -188,10 +188,16 @@ function llm(sys,user,cb){ /* user: строка или массив [{role,cont
       .then(function(r){return r.json();}).then(function(d){cb(d.content&&d.content[0]?d.content[0].text:null);})
       .catch(function(){cb(null);});}
   else if(c.provider==='groq'&&c.key){
-    fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+c.key,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.6,max_tokens:600,messages:[{role:'system',content:sys}].concat(msgs)})})
-      .then(function(r){return r.json();}).then(function(d){cb(d.choices&&d.choices[0]?d.choices[0].message.content:null);})
-      .catch(function(){cb(null);});}
+    var models=['meta-llama/llama-4-maverick-17b-128e-instruct','llama-3.3-70b-versatile'];
+    (function tryModel(mi){
+      if(mi>=models.length){cb(null);return;}
+      fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+c.key,'Content-Type':'application/json'},
+        body:JSON.stringify({model:models[mi],temperature:0.5,max_tokens:600,messages:[{role:'system',content:sys}].concat(msgs)})})
+        .then(function(r){return r.json();})
+        .then(function(d){var t=d.choices&&d.choices[0]?d.choices[0].message.content:null;
+          if(t)cb(t);else tryModel(mi+1);})
+        .catch(function(){tryModel(mi+1);});
+    })(0);}
   else cb(null);}
 function aiParse(text,cb){
   var sys='Ты парсер дневного замера. Верни ТОЛЬКО JSON {"energy":0-100|null,"kept":0-100|null,"hard":0-100|null}. energy — уровень энергии. kept — держался ли привычки «'+(S.habits[0]?habit(S.habits[0].id).title:'привычка')+'» (сорвался=5-20, наполовину=50-60, держался=85-100). hard — тяжело ли далось (легко=5-20, средне=40-60, тяжело=70-95). Не сказано — null.';
@@ -220,7 +226,7 @@ function chatAnswer(text,cb){
   '1. Отвечай по существу его слов: отражай контекст, попадай в его жизнь, никаких шаблонных лекций.\n'+
   '2. Давай механизм («почему так работает») + 2-3 конкретных шага, применимых сегодня. Цифры и протоколы приветствуются: свет в глаза в первые 30 минут после подъёма; кофеин минимум за 8 часов до сна; правило 10-3-2-1; 25-30 г белка на завтрак; прогулка 10 минут после еды; спальня 18-20°; экраны за час до сна; «правило 2 минут» для старта привычки.\n'+
   '3. Если данных мало — дай лучший ответ по тому, что есть, и задай ОДИН точный уточняющий вопрос в конце.\n'+
-  '4. Тон: на «ты», живой, уверенный, без воды и нравоучений, лёгкая ирония уместна. 3-6 коротких предложений или мини-список. Без эмодзи-спама (максимум один).\n'+
+  '4. Тон: на «ты», живой, уверенный, без воды и нравоучений, лёгкая ирония уместна. 3-6 коротких предложений или мини-список. Без эмодзи-спама (максимум один). Пиши на чистом грамотном русском, без английских слов и иностранных вкраплений.\n'+
   '5. ПРО ПРОДУКТ — ЖЁСТКО: НИКОГДА не упоминай газировку DZEN, банку, напиток или Додо Пиццу, если человек САМ прямо не спросил про напиток/банку/где купить. Ты эксперт, а не продавец. Если спросил: 0 г сахара, ~20 ккал/100 г, пребиотики, ~4 г клетчатки, без Е-шек, продаётся в Додо Пицце; говори «поддерживает», не «лечит».\n'+
   '6. Никаких диагнозов; при тревожных симптомах — одной строкой посоветуй врача и продолжи по существу.\n'+
   'Контекст человека из трекера: '+userCtx()+'.';

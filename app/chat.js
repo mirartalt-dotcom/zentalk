@@ -60,7 +60,9 @@ function handleText(text){
 function botTalk(text){typing(true);
   chatAnswer(text,function(ans){typing(false);el(ans,'msg bot');
     if(pending===null&&S.quiz&&S.habits.length)offerMain();});}
-function num0100(text){var t=wordsToNums(text.toLowerCase());
+function num0100(text){
+  if(text.trim().length>14)return null; /* длинная фраза = разговор, не ответ цифрой */
+  var t=wordsToNums(text.toLowerCase());
   var m=t.match(/\d{1,3}/);if(!m)return null;var n=+m[0];return n>100?null:n;}
 
 /* ---------- сценарии ---------- */
