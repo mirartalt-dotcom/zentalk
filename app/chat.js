@@ -14,8 +14,8 @@ document.getElementById('app').innerHTML=
 '  </div></div>'+
 ' <div class="chat-scroll" id="scroll"></div>'+
 ' <div class="chat-input">'+
-'  <button class="chat-btn chat-mic" id="mic" hidden>🎙</button>'+
-'  <input id="inp" type="text" placeholder="Напиши или наговори…" autocomplete="off">'+
+'  <button class="chat-btn chat-mic" id="mic" hidden aria-label="Наговорить голосом">🎙</button>'+
+'  <input id="inp" type="text" placeholder="Жми 🎙 и говори — или пиши" autocomplete="off">'+
 '  <button class="chat-btn chat-send" id="send">↑</button>'+
 ' </div></div>';
 
@@ -200,6 +200,10 @@ $('#inp').addEventListener('keydown',function(e){if(e.key==='Enter')$('#send').c
   var R=makeRecognizer(function(text){handleText(text);},
     function(on){mic.classList.toggle('listening',on);mic.textContent=on?'🔴':'🎙';});
   if(!R)return;mic.hidden=false;
-  mic.addEventListener('click',function(){ac();R.toggle();});})();
+  try{if(!localStorage.getItem('dzen10.micseen'))mic.classList.add('attract');}catch(e){}
+  mic.addEventListener('click',function(){ac();
+    mic.classList.remove('attract');
+    try{localStorage.setItem('dzen10.micseen','1');}catch(e){}
+    R.toggle();});})();
 
 greet();
