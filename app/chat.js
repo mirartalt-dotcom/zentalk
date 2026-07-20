@@ -58,8 +58,22 @@ function handleText(text){
     pending=h; /* не понял — остаёмся в вопросе, но ответим по-человечески */}
   botTalk(text);}
 function botTalk(text){typing(true);
-  chatAnswer(text,function(ans){typing(false);el(ans,'msg bot');
+  chatAnswer(text,function(ans,closing){typing(false);el(ans,'msg bot');
+    if(closing){closeTalk();return;}
     if(pending===null&&S.quiz&&S.habits.length)offerMain();});}
+/* мягкое завершение разговора + крючок на завтра */
+function closeTalk(){
+  clearChips();
+  setTimeout(function(){
+    var checked=S.lastCheck===todayStr();
+    var tail=checked
+      ? 'На сегодня всё по делу. Завтра вечером отметишься — и я спрошу, как зашло 🌿'
+      : 'Дальше — дело за замером. Тридцать секунд, и день в серии.';
+    el(tail,'msg bot');
+    chatReset();
+    if(checked)chips([{t:'🏆 Мои ачивки',fn:showAchv},{t:'⏰ Напоминание на вечер',fn:showRemind}]);
+    else chips([{t:'⚡ Замерить день',fn:startCheck},{t:'⏰ Напомнить вечером',fn:showRemind}]);
+  },900);}
 function num0100(text){
   var t=wordsToNums(text.toLowerCase());
   var m=t.match(/\d{1,3}/);if(!m)return null;var n=+m[0];if(n>100)return null;
@@ -184,11 +198,20 @@ function askHard(){
 function finishCheck(){
   var kept=[];S.habits.forEach(function(h,i){kept.push(chk['k'+i]!=null?chk['k'+i]:70);});
   var rec={energy:chk.energy||0,kept:kept,hard:chk.hard||50};
-  var out=checkInDay(rec);chk={};pshh();
+  var out=checkInDay(rec);chk={};pshh();chatReset();
   if(out.finale){finale(out.finale);return;}
   var dv=dayVerdict(rec);
   botMsg(dv.em+' '+dv.ti+' '+dv.su,function(){
-  botMsg('🔥 Серия: '+S.streak+' '+plural(S.streak,'день','дня','дней')+'. '+(7-((S.streak-1)%7+1)>0?('До финала сезона: '+(7-((S.streak-1)%7+1))+' '+plural(7-((S.streak-1)%7+1),'серия','серии','серий')+'.'):''),offerMain);});}
+    var left=7-((S.streak-1)%7+1);
+    botMsg('🔥 Серия: '+S.streak+' '+plural(S.streak,'день','дня','дней')+
+      (left>0?('. До финала сезона: '+left+' '+plural(left,'серия','серии','серий')):''),function(){
+      /* персональный совет на завтра по свежим цифрам */
+      typing(true);
+      var q='Мой сегодняшний замер: энергия '+rec.energy+' из 100, привычку держал на '+
+        Math.round(kept.reduce(function(a,b){return a+b;},0)/kept.length)+' из 100, тяжесть '+rec.hard+
+        ' из 100. Дай ОДИН короткий совет на завтра под эти цифры и одной строкой позови вернуться завтра. Максимум 3 строки.';
+      chatAnswer(q,function(ans){typing(false);el(ans,'msg bot');chatReset();
+        chips([{t:'🏆 Мои ачивки',fn:showAchv},{t:'⏰ Напоминание на вечер',fn:showRemind}]);});});});}
 function finale(days){
   botMsg('🏆 ФИНАЛ СЕЗОНА! '+days+' дней подряд. Ты правда красавчик.',function(){
     var cv=document.createElement('canvas');cv.width=1080;cv.height=1350;
