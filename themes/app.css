@@ -245,6 +245,12 @@ h2{font-size:clamp(23px,6.2vw,30px);font-weight:var(--h2w);letter-spacing:-.015e
 .msg-slider{width:min(78%,300px);align-self:flex-start;background:var(--card);border:1px solid var(--line);
   border-radius:20px;border-bottom-left-radius:6px;padding:12px 16px}
 .msg-slider .q-word{text-align:center}
+.cancel-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 14px;background:var(--soft);font-size:12.5px;color:var(--acc-d);
+  font-weight:650;letter-spacing:.02em;animation:msgIn .3s ease}
+.cancel-bar button{border:0;background:transparent;color:var(--acc-d);font-family:'Inter',sans-serif;
+  font-size:13px;font-weight:750;cursor:pointer;padding:8px 10px;margin:-8px -10px -8px 0;min-height:36px}
+.cancel-bar button:active{opacity:.6}
 .chat-input{display:flex;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom));
   background:var(--card);border-top:1px solid var(--line);align-items:center}
 .chat-input input{flex:1;border:1.5px solid var(--line);background:var(--bg);border-radius:22px;

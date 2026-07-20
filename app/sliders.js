@@ -11,7 +11,7 @@ document.getElementById('app').innerHTML=
 '  <div class="brandline">DZEN · Энергия</div>'+
 '  <h1 class="display">Насколько ты<br><em>в ресурсе?</em></h1>'+
 '  <div class="ticker">'+T.ticker+'</div>'+
-'  <p class="cine-sub">Мир давит, а жить хочется в кайф — и долго. Замерь заряд: 6 ползунков, 90 секунд. Дальше — 30 секунд в день.</p>'+
+'  <p class="cine-sub">Мир давит, а жить хочется в радость — и долго. Замерь заряд: 6 ползунков, 90 секунд. Дальше — 30 секунд в день.</p>'+
 '  <button class="btn btn-pri" id="btn-start">Замерить энергию</button>'+
 '  <div class="tiny center" style="opacity:.7">без регистрации · всё хранится только у тебя</div>'+
 ' </div></section>'+
