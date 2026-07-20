@@ -271,7 +271,9 @@ window.dzenVoiceApply=function(t){aiParse(t,function(r){applyVoice(r||localParse
       aiParse(text,function(r){applyVoice(r,text);});},
     function(on){btn.classList.toggle('listening',on);
       btn.innerHTML=on?'<span>🔴</span> Слушаю… говори (тап — стоп)':'<span>🎙</span> Наговори голосом — ползунки встанут сами';
-      if(on){var l=$('#voice-line');l.hidden=false;l.textContent='Например: «энергия 70, сладкое не ел, далось тяжело»';}});
+      if(on){var l=$('#voice-line');l.hidden=false;l.textContent='Например: «энергия 70, сладкое не ел, далось тяжело»';}},
+    function(n){var l=$('#voice-line');l.hidden=false;
+      l.textContent=n==='thinking'?'Распознаю голос…':(n||'');});
   if(!R){btn.hidden=true;return;}
   btn.hidden=false;btn.addEventListener('click',function(){ac();R.toggle();});})();
 

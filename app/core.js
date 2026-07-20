@@ -238,20 +238,65 @@ function chatAnswer(text,cb){
     for(var i=0;i<FAQ.length;i++)if(FAQ[i][0].test(text)){cb(FAQ[i][1]);return;}
     cb('Связь с нейронкой моргнула — повтори через пару секунд, я отвечу.');});}
 
-/* распознавание речи */
-function makeRecognizer(onText,onState){
+/* распознавание речи: запись → Groq Whisper (надёжно на iPhone), фолбэк — встроенное */
+function makeRecognizer(onText,onState,onNote){
+  var note=onNote||function(){};
+  var conf=aiConf();
+  var canSTT=!!(conf.key&&conf.provider!=='local'&&navigator.mediaDevices&&
+    navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+  if(canSTT){
+    var rec=null,stream=null,chunks=[],busy=false,recording=false,maxT=null;
+    function stopTracks(){if(stream){stream.getTracks().forEach(function(t){t.stop();});stream=null;}}
+    function finishStop(){recording=false;onState(false);if(maxT){clearTimeout(maxT);maxT=null;}
+      try{rec.stop();}catch(e){}}
+    return {supported:true,toggle:function(){
+      if(busy)return;
+      if(recording){finishStop();return;}
+      note(null);
+      navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+        stream=st;chunks=[];
+        try{rec=new MediaRecorder(st);}catch(e){stopTracks();note('Микрофон не завёлся — напиши текстом.');return;}
+        rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+        rec.onstop=function(){
+          stopTracks();
+          var type=rec.mimeType||'audio/mp4';
+          var blob=new Blob(chunks,{type:type});
+          if(blob.size<1500){note('Коротко получилось — нажми 🎙 и скажи фразу целиком.');return;}
+          busy=true;note('thinking');
+          var ext=type.indexOf('webm')>=0?'webm':type.indexOf('ogg')>=0?'ogg':type.indexOf('wav')>=0?'wav':'m4a';
+          var fd=new FormData();
+          fd.append('file',new File([blob],'voice.'+ext,{type:type}));
+          fd.append('model','whisper-large-v3-turbo');
+          fd.append('language','ru');
+          fd.append('temperature','0');
+          fetch('https://api.groq.com/openai/v1/audio/transcriptions',{method:'POST',
+            headers:{'Authorization':'Bearer '+aiConf().key},body:fd})
+            .then(function(r){return r.json();})
+            .then(function(d){busy=false;note(null);
+              var t=d&&d.text?d.text.trim():'';
+              if(t)onText(t);else note('Не расслышал — попробуй ещё раз, чуть громче.');})
+            .catch(function(){busy=false;note('Сеть моргнула — скажи ещё раз.');});
+        };
+        try{rec.start();}catch(e){stopTracks();note('Микрофон не завёлся — напиши текстом.');return;}
+        recording=true;onState(true);
+        maxT=setTimeout(function(){if(recording)finishStop();},30000);
+      }).catch(function(){
+        note('Телефон не дал доступ к микрофону. Разреши: значок «АА» в адресной строке Safari → Настройки сайта → Микрофон → Разрешить.');});
+    }};
+  }
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR)return null;
-  var listening=false,rec=null;
+  var listening=false,r2=null;
   return {supported:true,
     toggle:function(){
-      if(listening){try{rec.stop();}catch(e){}return;}
-      rec=new SR();rec.lang='ru-RU';rec.interimResults=false;rec.maxAlternatives=1;
+      if(listening){try{r2.stop();}catch(e){}return;}
+      r2=new SR();r2.lang='ru-RU';r2.interimResults=false;r2.maxAlternatives=1;
       listening=true;onState(true);
-      rec.onresult=function(e){listening=false;onState(false);onText(e.results[0][0].transcript);};
-      rec.onerror=function(){listening=false;onState(false);};
-      rec.onend=function(){if(listening){listening=false;onState(false);}};
-      try{rec.start();}catch(e){listening=false;onState(false);}}};}
+      r2.onresult=function(e){listening=false;onState(false);onText(e.results[0][0].transcript);};
+      r2.onerror=function(e){listening=false;onState(false);
+        note(e&&e.error==='not-allowed'?'Разреши доступ к микрофону в настройках браузера.':'Не расслышал — попробуй ещё раз.');};
+      r2.onend=function(){if(listening){listening=false;onState(false);}};
+      try{r2.start();}catch(e){listening=false;onState(false);}}};}
 
 /* побег из встроенного браузера (Телеграм и т.п.) в Safari/Chrome */
 (function(){

@@ -226,7 +226,12 @@ $('#send').addEventListener('click',function(){var v=$('#inp').value.trim();
 $('#inp').addEventListener('keydown',function(e){if(e.key==='Enter')$('#send').click();});
 (function(){var mic=$('#mic');
   var R=makeRecognizer(function(text){handleText(text);},
-    function(on){mic.classList.toggle('listening',on);mic.textContent=on?'🔴':'🎙';});
+    function(on){mic.classList.toggle('listening',on);mic.textContent=on?'🔴':'🎙';},
+    function(n){
+      if(n==='thinking'){typing(true);return;}
+      typing(false);
+      if(n)el(n,'msg bot');
+    });
   if(!R)return;mic.hidden=false;
   try{if(!localStorage.getItem('dzen10.micseen'))mic.classList.add('attract');}catch(e){}
   mic.addEventListener('click',function(){ac();
