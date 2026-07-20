@@ -8,14 +8,14 @@ document.getElementById('app').innerHTML=
 '  <img class="chat-ava" src="'+A+'img/mascot.jpg" alt="">'+
 '  <div><div class="chat-head-name">Банка DZEN</div><div class="chat-head-st" id="head-st">онлайн · следит за энергией</div></div>'+
 '  <div class="chat-head-btns">'+
-'   <button class="chip-ic" id="hb-check" title="Замер дня">⚡</button>'+
-'   <button class="chip-ic" id="hb-achv" title="Ачивки">🏆</button>'+
-'   <button class="chip-ic" id="hb-remind" title="Напоминание">⏰</button>'+
+'   <button class="chip-ic" id="hb-check" aria-label="Замер дня" title="Замер дня">⚡</button>'+
+'   <button class="chip-ic" id="hb-sum" aria-label="Сводка недели" title="Сводка недели">◷</button>'+
+'   <button class="chip-ic" id="hb-achv" aria-label="Ачивки" title="Ачивки">🏆</button>'+
 '  </div></div>'+
 ' <div class="chat-scroll" id="scroll"></div>'+
 ' <div class="chat-input">'+
 '  <button class="chat-btn chat-mic" id="mic" hidden aria-label="Наговорить голосом">🎙</button>'+
-'  <input id="inp" type="text" placeholder="Жми 🎙 и говори — или пиши" autocomplete="off">'+
+'  <input id="inp" type="text" placeholder="Скажи или напиши…" autocomplete="off">'+
 '  <button class="chat-btn chat-send" id="send">↑</button>'+
 ' </div></div>';
 
@@ -93,10 +93,20 @@ function greet(){
   else if(S.lastCheck!==t){var d=Math.min((S.streak%7)+1,7);
     botMsg('С возвращением! Серия '+d+' из 7 ждёт замера — 30 секунд. Начнём?',function(){
       chips([{t:'⚡ Замерить день',fn:startCheck},{t:'Позже',fn:function(){botMsg('Ок, я тут. Кнопка ⚡ сверху — когда будешь готов.');}}]);});}
-  else{botMsg('Сегодня уже засчитано ✓ Серия: '+S.streak+' '+plural(S.streak,'день','дня','дней')+' 🔥 Поболтаем? Спроси про энергию, привычки или банку.',function(){offerMain();});}
+  else{botMsg('Сегодня уже засчитано. Вот как идёт сезон:',function(){
+    summaryCard();
+    setTimeout(function(){
+      var ins=bestInsight();
+      if(ins)botMsg(ins,offerMain);
+      else botMsg('Спроси что угодно про энергию, сон или привычки — отвечу коротко и по делу.',offerMain);
+    },900);});}
 }
 function offerMain(){clearChips();
-  chips([{t:'⚡ Замер дня',fn:startCheck},{t:'🏆 Ачивки',fn:showAchv},{t:'⏰ Напоминание',fn:showRemind}]);}
+  var done=S.lastCheck===todayStr();
+  var list=done?[{t:'Сводка недели',fn:showSummary},{t:'Ачивки',fn:showAchv}]
+               :[{t:'Замерить день',fn:startCheck},{t:'Сводка недели',fn:showSummary}];
+  list.push({t:'Напоминание',fn:showRemind});
+  chips(list);}
 
 /* онбординг */
 var onbAns={};
@@ -228,6 +238,57 @@ function offerNext(days){
       chips([{t:'🌿 Добавить вторую',fn:showShelf},{t:'Пока хватит одной',fn:function(){botMsg('Мудро. Лучше одна живая, чем две мёртвые.',offerMain);}}]);});}
   else offerMain();}
 
+/* ---------- сводка недели: кольцо серии + цифры + график (в стиле Whoop) ---------- */
+function summaryCard(){
+  var day=S.streak===0?0:((S.streak-1)%7)+1;
+  var season=Math.floor((Math.max(S.streak,1)-1)/7)+1;
+  var vals=[],labels=['пн','вт','ср','чт','пт','сб','вс'];
+  for(var i=6;i>=0;i--){var d=addDays(todayStr(),-i);var r=S.days[d];
+    vals.push(r?r.energy:null);
+    labels[6-i]=['вс','пн','вт','ср','чт','пт','сб'][new Date(d.split('-')[0],+d.split('-')[1]-1,+d.split('-')[2]).getDay()];}
+  var known=vals.filter(function(v){return v!==null;});
+  var avg=known.length?Math.round(known.reduce(function(a,b){return a+b;},0)/known.length):null;
+  var last=known.length?known[known.length-1]:null;
+  var delta=known.length>1?(known[known.length-1]-known[0]):null;
+  var R=46,C=2*Math.PI*R;
+  var bars='',mx=Math.max(60,Math.max.apply(null,known.length?known:[60]));
+  vals.forEach(function(v,i){
+    var x=8+i*40, h=v===null?4:Math.max(6,(v/mx)*58), y=64-h;
+    var isToday=(i===6);
+    bars+='<rect x="'+x+'" y="'+y+'" width="22" height="'+h+'" rx="7" fill="'+(v===null?'#E7DFCD':(isToday?'#7EA048':'#A8C96B'))+'"/>'+
+      (v!==null?'<text x="'+(x+11)+'" y="'+(y-5)+'" text-anchor="middle" font-size="10" font-weight="600" fill="rgba(35,34,30,.55)" font-family="Inter,sans-serif">'+v+'</text>':'')+
+      '<text x="'+(x+11)+'" y="79" text-anchor="middle" font-size="9.5" fill="rgba(35,34,30,'+(isToday?'.7':'.4')+')" font-family="Inter,sans-serif"'+(isToday?' font-weight="700"':'')+'>'+labels[i]+'</text>';
+  });
+  var d=document.createElement('div');
+  d.className='msg bot summary-msg';
+  d.innerHTML=
+   '<div class="sum-top">'+
+   ' <div class="sum-ring"><svg viewBox="0 0 110 110">'+
+   '  <circle cx="55" cy="55" r="'+R+'" fill="none" stroke="#EDF2DC" stroke-width="9"/>'+
+   '  <circle cx="55" cy="55" r="'+R+'" fill="none" stroke="#A8C96B" stroke-width="9" stroke-linecap="round"'+
+   '   transform="rotate(-90 55 55)" stroke-dasharray="'+C+'" stroke-dashoffset="'+C+'" class="sum-arc" style="--to:'+(C*(1-day/7))+'"/>'+
+   ' </svg><div class="sum-ring-c"><b>'+day+'</b><span>из 7</span></div></div>'+
+   ' <div class="sum-side"><div class="sum-eyebrow">Сезон '+season+'</div>'+
+   '  <div class="sum-habit">'+(S.habits[0]?habit(S.habits[0].id).title:'—')+'</div>'+
+   '  <div class="sum-note">'+(day===7?'финал сезона':'ещё '+(7-day)+' '+plural(7-day,'серия','серии','серий'))+'</div></div>'+
+   '</div>'+
+   '<div class="stats-row">'+
+   ' <div class="stat"><div class="stat-num">'+(last!==null?last:'—')+'</div><div class="stat-lab">сегодня</div></div>'+
+   ' <div class="stat"><div class="stat-num">'+(avg!==null?avg:'—')+'</div><div class="stat-lab">средне</div></div>'+
+   ' <div class="stat"><div class="stat-num">'+(delta!==null?((delta>=0?'+':'')+delta):'—')+'</div><div class="stat-lab">неделя</div></div>'+
+   '</div>'+
+   '<svg class="sum-bars" viewBox="0 0 288 84">'+bars+'</svg>';
+  SCROLL.appendChild(d);down();
+  setTimeout(function(){var a=d.querySelector('.sum-arc');if(a)a.style.strokeDashoffset=a.style.getPropertyValue('--to');},80);
+}
+function showSummary(){clearChips();
+  if(!S.habits.length){botMsg('Сводка появится, когда выберешь привычку и сделаешь первый замер.',offerMain);return;}
+  summaryCard();
+  var ins=bestInsight();
+  setTimeout(function(){
+    if(ins)botMsg(ins,function(){offerMain();});else offerMain();
+  },700);}
+
 /* шапка */
 $('#hb-check').addEventListener('click',function(){ac();startCheck();});
 function showAchv(){clearChips();
@@ -240,7 +301,7 @@ function showRemind(){clearChips();
   botMsg('Напомню замерить день каждый вечер в '+(S.remind||'21:30')+'. Как удобнее?',function(){
     chips([{t:'⏰ Бот в Telegram',fn:function(){openBot();botMsg('Открыл бота — нажми «Старт». Отключить: /stop.',offerMain);}},
            {t:'📅 Календарь',fn:function(){downloadICS();botMsg('Скинул файл — открой, и календарь будет звать вечером.',offerMain);}}]);});}
-$('#hb-remind').addEventListener('click',showRemind);
+$('#hb-sum').addEventListener('click',function(){ac();showSummary();});
 
 /* ввод */
 $('#send').addEventListener('click',function(){var v=$('#inp').value.trim();
