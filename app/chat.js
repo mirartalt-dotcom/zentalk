@@ -66,14 +66,13 @@ function closeTalk(){
   clearChips();
   setTimeout(function(){
     var checked=S.lastCheck===todayStr();
-    var tail=checked
-      ? 'На сегодня всё по делу. Завтра вечером отметишься — и я спрошу, как зашло 🌿'
-      : 'Дальше — дело за замером. Тридцать секунд, и день в серии.';
-    el(tail,'msg bot');
     chatReset();
-    if(checked)chips([{t:'🏆 Мои ачивки',fn:showAchv},{t:'⏰ Напоминание на вечер',fn:showRemind}]);
-    else chips([{t:'⚡ Замерить день',fn:startCheck},{t:'⏰ Напомнить вечером',fn:showRemind}]);
-  },900);}
+    if(checked){
+      el('Завтра вечером отметишься — спрошу, как зашло 🌿','msg bot');
+      chips([{t:'🏆 Мои ачивки',fn:showAchv},{t:'⏰ Напоминание на вечер',fn:showRemind}]);}
+    else{
+      chips([{t:'⚡ Замерить день · 30 сек',fn:startCheck},{t:'⏰ Напомнить вечером',fn:showRemind}]);}
+  },1100);}
 function num0100(text){
   var t=wordsToNums(text.toLowerCase());
   var m=t.match(/\d{1,3}/);if(!m)return null;var n=+m[0];if(n>100)return null;
