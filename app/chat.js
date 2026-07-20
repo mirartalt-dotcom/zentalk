@@ -1,6 +1,9 @@
 /* ============ DZEN · Энергия — чат-версия (тема задаётся страницей) ============ */
 'use strict';
 var T=window.DZEN_THEME,A=window.DZEN_ASSETS;
+var MIC_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+ '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/></svg>';
+var STOP_SVG='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>';
 
 document.getElementById('app').innerHTML=
 '<div class="chat-app">'+
@@ -14,13 +17,19 @@ document.getElementById('app').innerHTML=
 '  </div></div>'+
 ' <div class="chat-scroll" id="scroll"></div>'+
 ' <div class="chat-input">'+
-'  <button class="chat-btn chat-mic" id="mic" hidden aria-label="Наговорить голосом">🎙</button>'+
+'  <button class="chat-btn chat-mic" id="mic" hidden aria-label="Наговорить голосом">'+MIC_SVG+'</button>'+
 '  <input id="inp" type="text" placeholder="Скажи или напиши…" autocomplete="off">'+
 '  <button class="chat-btn chat-send" id="send">↑</button>'+
 ' </div></div>';
 
 var SCROLL=$('#scroll');
-function down(){SCROLL.scrollTop=SCROLL.scrollHeight;}
+/* прокрутка вниз: сразу + после отрисовки/загрузки картинок (иначе полка прячется под полем ввода) */
+function down(){
+  SCROLL.scrollTop=SCROLL.scrollHeight;
+  requestAnimationFrame(function(){SCROLL.scrollTop=SCROLL.scrollHeight;});
+  setTimeout(function(){SCROLL.scrollTop=SCROLL.scrollHeight;},60);
+  setTimeout(function(){SCROLL.scrollTop=SCROLL.scrollHeight;},320);
+}
 function el(html,cls){var d=document.createElement('div');if(cls)d.className=cls;d.innerHTML=html;SCROLL.appendChild(d);down();return d;}
 function meMsg(t){el(t,'msg me');}
 var typingEl=null;
@@ -145,11 +154,30 @@ function showShelf(){
     if(used.indexOf(h.id)>=0)return;
     var b=document.createElement('button');b.className='poster';
     var badge=(h.id===S.recommend&&!S.habits.length)?'<div class="poster-badge">⚡ лучший ход</div>':'';
-    b.innerHTML='<img src="'+A+'img/'+h.img+'.jpg" alt="">'+badge+'<div class="poster-veil"></div>'+
-     '<div class="poster-txt"><div class="poster-title" style="font-size:19px">'+h.title+'</div></div>';
+    b.innerHTML='<img src="'+A+'img/'+h.img+'.jpg" alt="" loading="eager">'+badge+'<div class="poster-veil"></div>'+
+     '<div class="poster-txt"><div class="poster-title">'+h.title+'</div>'+
+     '<div class="poster-line">'+h.line+'</div></div>';
+    var im=b.querySelector('img');
+    if(im)im.addEventListener('load',down);
     b.addEventListener('click',function(){clearChips();pickHabit(h);});
     sh.appendChild(b);});
-  SCROLL.appendChild(sh);down();}
+  /* подсказка над полкой, чтобы она не отжимала карточки вниз */
+  var hint=document.createElement('div');
+  hint.className='shelf-swipe tiny';
+  hint.textContent='листай вбок — их шесть →';
+  SCROLL.appendChild(hint);
+  SCROLL.appendChild(sh);
+  /* гарантированно показываем полку целиком: скроллим так, чтобы её низ был у поля ввода */
+  function reveal(){
+    var r=sh.getBoundingClientRect(),cr=SCROLL.getBoundingClientRect();
+    var over=r.bottom-cr.bottom;
+    if(over>0)SCROLL.scrollTop+=over+12;
+    else SCROLL.scrollTop=SCROLL.scrollHeight;
+  }
+  down();reveal();
+  [60,260,600,1100].forEach(function(ms){setTimeout(reveal,ms);});
+  var imgs=sh.querySelectorAll('img');
+  Array.prototype.forEach.call(imgs,function(im){im.addEventListener('load',reveal);});}
 function pickHabit(h){
   var add=S.habits.length>0;
   S.habits.push({id:h.id,start:todayStr()});
@@ -165,6 +193,8 @@ function pickHabit(h){
 var chk={};
 function comboParse(text){ /* true = что-то принял и продвинулся */
   var p=localParse(text);
+  /* «не знаю / нормально всё» — не данные, а разговор: пусть отвечает эксперт */
+  if(/(не знаю|незнаю|хз|без понятия|не понимаю|а что|как это)/i.test(text))return false;
   var got=false;
   if(p.energy!=null&&chk.energy==null){chk.energy=p.energy;got=true;}
   if(p.kept!=null){S.habits.forEach(function(h,i){if(chk['k'+i]==null)chk['k'+i]=p.kept;});got=true;}
@@ -249,15 +279,22 @@ function summaryCard(){
   var known=vals.filter(function(v){return v!==null;});
   var avg=known.length?Math.round(known.reduce(function(a,b){return a+b;},0)/known.length):null;
   var last=known.length?known[known.length-1]:null;
-  var delta=known.length>1?(known[known.length-1]-known[0]):null;
+  /* дельта: свежая половина недели против ранней — честнее, чем «первый против последнего» */
+  var delta=null;
+  if(known.length>=2){
+    var half=Math.max(1,Math.floor(known.length/2));
+    var early=known.slice(0,half),late=known.slice(-half);
+    var m1=early.reduce(function(a,b){return a+b;},0)/early.length;
+    var m2=late.reduce(function(a,b){return a+b;},0)/late.length;
+    delta=Math.round(m2-m1);}
   var R=46,C=2*Math.PI*R;
   var bars='',mx=Math.max(60,Math.max.apply(null,known.length?known:[60]));
   vals.forEach(function(v,i){
     var x=8+i*40, h=v===null?4:Math.max(6,(v/mx)*58), y=64-h;
     var isToday=(i===6);
     bars+='<rect x="'+x+'" y="'+y+'" width="22" height="'+h+'" rx="7" fill="'+(v===null?'#E7DFCD':(isToday?'#7EA048':'#A8C96B'))+'"/>'+
-      (v!==null?'<text x="'+(x+11)+'" y="'+(y-5)+'" text-anchor="middle" font-size="10" font-weight="600" fill="rgba(35,34,30,.55)" font-family="Inter,sans-serif">'+v+'</text>':'')+
-      '<text x="'+(x+11)+'" y="79" text-anchor="middle" font-size="9.5" fill="rgba(35,34,30,'+(isToday?'.7':'.4')+')" font-family="Inter,sans-serif"'+(isToday?' font-weight="700"':'')+'>'+labels[i]+'</text>';
+      (v!==null?'<text class="bar-val" x="'+(x+11)+'" y="'+(y-5)+'" text-anchor="middle" font-size="10" font-weight="600" font-family="Inter,sans-serif">'+v+'</text>':'')+
+      '<text class="bar-day'+(isToday?' now':'')+'" x="'+(x+11)+'" y="79" text-anchor="middle" font-size="9.5" font-family="Inter,sans-serif"'+(isToday?' font-weight="700"':'')+'>'+labels[i]+'</text>';
   });
   var d=document.createElement('div');
   d.className='msg bot summary-msg';
@@ -309,7 +346,7 @@ $('#send').addEventListener('click',function(){var v=$('#inp').value.trim();
 $('#inp').addEventListener('keydown',function(e){if(e.key==='Enter')$('#send').click();});
 (function(){var mic=$('#mic');
   var R=makeRecognizer(function(text){handleText(text);},
-    function(on){mic.classList.toggle('listening',on);mic.textContent=on?'🔴':'🎙';},
+    function(on){mic.classList.toggle('listening',on);mic.innerHTML=on?STOP_SVG:MIC_SVG;},
     function(n){
       if(n==='thinking'){typing(true);return;}
       typing(false);
